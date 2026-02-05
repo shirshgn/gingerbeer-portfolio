@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gingerbeer — Generative Visual Systems</title>
+  <meta name="description" content="Gingerbeer — generative visual systems, live code, audio-reactive atmospheres." />
+
+  <style>
+    :root{
+      --bg:#050705;
+      --panel:#070b07;
+      --text:#d9ffe1;
+      --muted:#7eea96;
+      --hair:rgba(126,234,150,.16);
+
+      --glow:rgba(80, 255, 140, .28);
+      --glow2:rgba(80, 255, 140, .12);
+
+      --radius:18px;
+      --max:1100px;
+
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+
+    body{
+      margin:0;
+      font-family: var(--mono);
+      background: var(--bg);
+      color:var(--text);
+      letter-spacing:.25px;
+    }
+
+    /* Hydra background canvas */
+    #hydra-bg{
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;   /* site is clickable; canvas isn't */
+      opacity: 0.62;          /* tune this */
+      filter: contrast(1.06) saturate(1.08);
+    }
+
+    /* subtle film grain + scan shimmer */
+    body::before{
+      content:"";
+      position:fixed; inset:0;
+      pointer-events:none;
+      z-index: 1;
+      background:
+        linear-gradient(rgba(80,255,140,.03), rgba(80,255,140,.01)),
+        repeating-linear-gradient(
+          180deg,
+          rgba(0,0,0,.0) 0px,
+          rgba(0,0,0,.0) 2px,
+          rgba(0,0,0,.10) 3px
+        );
+      mix-blend-mode: overlay;
+      opacity:.22;
+    }
+
+    a{color:inherit; text-decoration:none}
+    a:hover{opacity:.9}
+
+    .wrap{
+      position: relative;
+      z-index: 3;
+      max-width:var(--max);
+      margin:0 auto;
+      padding:22px 18px 70px;
+    }
+
+    /* Top nav */
+    .nav{
+      position:sticky;
+      top:0;
+      z-index: 4;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(to bottom, rgba(5,7,5,.88), rgba(5,7,5,.38));
+      border-bottom: 1px solid var(--hair);
+    }
+    .nav-inner{
+      max-width:var(--max);
+      margin:0 auto;
+      padding:14px 18px;
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px;
+    }
+    .brand{
+      display:flex; align-items:baseline; gap:10px;
+      font-weight:800;
+      letter-spacing:1.1px;
+      text-transform: uppercase;
+    }
+    .brand small{
+      color:rgba(126,234,150,.85);
+      font-weight:650;
+      letter-spacing:.6px;
+      text-transform:none
+    }
+    .links{display:flex; gap:14px; flex-wrap:wrap; justify-content:flex-end}
+    .links a{
+      padding:8px 10px;
+      border:1px solid transparent;
+      border-radius:999px;
+      color:rgba(126,234,150,.85);
+      font-size:13px;
+    }
+    .links a:hover{
+      color:var(--text);
+      border-color:rgba(80,255,140,.28);
+      background:rgba(80,255,140,.04);
+      box-shadow: 0 0 30px var(--glow2);
+    }
+
+    .topline{display:flex; align-items:center; gap:10px}
+    .dot{
+      width:8px; height:8px; border-radius:50%;
+      background: rgba(80,255,140,.95);
+      box-shadow: 0 0 22px rgba(80,255,140,.7);
+    }
+
+    /* Hero */
+    .hero{
+      margin-top:18px;
+      border:1px solid rgba(126,234,150,.16);
+      border-radius: calc(var(--radius) + 8px);
+      overflow:hidden;
+      position:relative;
+      background: rgba(5, 7, 5, 0.78);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 30px 80px rgba(0,0,0,.45);
+    }
+    .hero .frame{
+      padding: 26px;
+    }
+
+    h1{
+      margin:0 0 10px 0;
+      font-size: clamp(34px, 5vw, 56px);
+      line-height:1.02;
+      letter-spacing:1.2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 28px rgba(80,255,140,.12);
+    }
+    .cursor{
+      color: rgba(80,255,140,.95);
+      text-shadow: 0 0 18px rgba(80,255,140,.55);
+      animation: blink 1s steps(1) infinite;
+    }
+    @keyframes blink{ 50%{opacity:0} }
+
+    .tagline{
+      margin:0 0 14px 0;
+      color:rgba(126,234,150,.88);
+      font-size: 14px;
+      line-height:1.6;
+      max-width: 70ch;
+    }
+    .chips{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{
+      border:1px solid rgba(126,234,150,.20);
+      background: rgba(80,255,140,.04);
+      border-radius:999px;
+      padding:8px 10px;
+      font-size: 12px;
+      color: var(--text);
+      box-shadow: 0 0 0 1px rgba(0,0,0,.28) inset;
+    }
+    .chip.glow{
+      border-color: rgba(80, 255, 140, .40);
+      box-shadow: 0 0 0 1px rgba(0,0,0,.28) inset, 0 0 40px var(--glow);
+    }
+
+    /* Sections */
+    section{margin-top:44px}
+    .section-head{
+      display:flex; align-items:baseline; justify-content:space-between;
+      gap:14px; flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    h2{
+      margin:0;
+      font-size: 14px;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: rgba(126,234,150,.95);
+    }
+    .hint{color:rgba(126,234,150,.70); font-size:13px}
+
+    /* Grid */
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:14px;
+    }
+    .card{
+      grid-column: span 6;
+      border:1px solid rgba(126,234,150,.16);
+      border-radius: var(--radius);
+      overflow:hidden;
+      background: rgba(5, 7, 5, 0.78);
+      backdrop-filter: blur(10px);
+      position:relative;
+      transform: translateY(0);
+      transition: 220ms ease;
+    }
+    @media (max-width: 880px){
+      .card{grid-column: span 12;}
+      .hero .frame{padding:18px}
+    }
+
+    .card video{
+      width:100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      display:block;
+      background: #000;
+      filter: contrast(1.02) saturate(1.02);
+    }
+    .card-body{
+      padding:14px 14px 16px;
+      display:flex; gap:10px; flex-direction:column;
+    }
+    .card-title{
+      margin:0;
+      font-weight:800;
+      letter-spacing:.6px;
+      font-size:14px;
+      text-transform: uppercase;
+    }
+    .card-desc{
+      margin:0;
+      color:rgba(126,234,150,.82);
+      font-size:13px;
+      line-height:1.55;
+    }
+    .meta{
+      display:flex; gap:8px; flex-wrap:wrap;
+      margin-top:4px;
+    }
+    .pill{
+      font-size:12px;
+      padding:6px 8px;
+      border-radius:999px;
+      color: rgba(126,234,150,.9);
+      border:1px solid rgba(126,234,150,.18);
+      background: rgba(80,255,140,.04);
+    }
+    .card:hover{
+      border-color: rgba(80,255,140,.38);
+      box-shadow: 0 0 0 1px rgba(0,0,0,.25) inset, 0 0 60px var(--glow);
+      transform: translateY(-2px);
+    }
+
+    /* Panels */
+    .panel{
+      border:1px solid rgba(126,234,150,.16);
+      border-radius: var(--radius);
+      background: rgba(5, 7, 5, 0.78);
+      backdrop-filter: blur(10px);
+      padding:16px;
+      line-height:1.7;
+      color:rgba(126,234,150,.84);
+    }
+    .panel strong{color:var(--text); font-weight:800}
+    .split{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:14px;
+    }
+    @media (max-width: 880px){
+      .split{grid-template-columns:1fr;}
+    }
+
+    footer{
+      margin-top:56px;
+      padding-top:18px;
+      border-top:1px solid rgba(126,234,150,.16);
+      color:rgba(126,234,150,.78);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      gap:10px;
+      font-size:13px;
+    }
+
+    /* Small notice line */
+    .note{
+      margin-top:10px;
+      color:rgba(126,234,150,.65);
+      font-size:12px;
+      letter-spacing:.4px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Hydra background (no editor, no UI, just the patch running) -->
+  <canvas id="hydra-bg" aria-hidden="true"></canvas>
+
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="brand">
+        <span class="topline"><span class="dot"></span>Gingerbeerrrrrrr</span>
+      </div>
+      <div class="links">
+        <a href="#works">Works</a>
+        <a href="#live">Live</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <header class="hero" id="top">
+      <div class="frame">
+        <h1>GINGER BEER<span class="cursor">_</span></h1>
+        <p class="tagline">
+        </p>
+        <div class="chips" aria-label="tags">
+          <span class="chip glow">Hydra</span>
+          <span class="chip">Live code</span>
+          <span class="chip">Audio reactive</span>
+          <span class="chip">Camera input</span>
+          <span class="chip">Projection</span>
+        </div>
+        <div class="note"></div>
+      </div>
+    </header>
+
+    <section id="works">
+      <div class="section-head">
+        <h2>Works</h2>
+        <div class="hint">Loops · systems · behaviors</div>
+      </div>
+
+      <div class="grid">
+        <article class="card">
+          <video src="assets/signal_garden.mp4" autoplay muted loop playsinline preload="metadata"></video>
+          <div class="card-body">
+            <p class="card-title"></p>
+            <p class="card-desc">.</p>
+            <div class="meta">
+              <span class="pill"></span><span class="pill"></span><span class="pill"></span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <video src="assets/voronoi_organisms.mp4" autoplay muted loop playsinline preload="metadata"></video>
+          <div class="card-body">
+            <p class="card-title"></p>
+            <p class="card-desc"></p>
+            <div class="meta">
+              <span class="pill"></span><span class="pill"></span><span class="pill"></span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <video src="assets/camera_mutation.mp4" autoplay muted loop playsinline preload="metadata"></video>
+          <div class="card-body">
+            <p class="card-title">Camera Mutation Engine</p>
+            <p class="card-desc">Live camera input turned into a breathing surface. Feedback · pixel drift · bloom.</p>
+            <div class="meta">
+              <span class="pill">camera</span><span class="pill">feedback</span><span class="pill">live</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <video src="assets/noise_studies.mp4" autoplay muted loop playsinline preload="metadata"></video>
+          <div class="card-body">
+            <p class="card-title">Noise & Oscillation Studies</p>
+            <p class="card-desc">Layered noise fields and oscillators. Organic shimmer · signal ghosts.</p>
+            <div class="meta">
+              <span class="pill">noise</span><span class="pill">osc</span><span class="pill">grain</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="live">
+      <div class="section-head">
+        <h2>Live</h2>
+        <div class="hint">Performance systems</div>
+      </div>
+
+      <div class="grid">
+        <article class="card">
+          <video src="assets/live_multiprojection.mp4" autoplay muted loop playsinline preload="metadata"></video>
+          <div class="card-body">
+            <p class="card-title">Multi-Projection Live Visuals</p>
+            <p class="card-desc">Real-time layered systems designed for space. Reactive motion + live modulation.</p>
+            <div class="meta">
+              <span class="pill">3 projectors</span><span class="pill">live mod</span><span class="pill">space</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <video src="assets/techno_systems.mp4" autoplay muted loop playsinline preload="metadata"></video>
+          <div class="card-body">
+            <p class="card-title">Techno Reactive Systems</p>
+            <p class="card-desc">High density modulation for fast music. Aggressive signal deformation (still smooth).</p>
+            <div class="meta">
+              <span class="pill">fft</span><span class="pill">tempo</span><span class="pill">density</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <video src="assets/meditation_env.mp4" autoplay muted loop playsinline preload="metadata"></video>
+          <div class="card-body">
+            <p class="card-title">Meditative Environments</p>
+            <p class="card-desc">Slow botanical atmospheres. Soft response · gentle drift · immersive calm.</p>
+            <div class="meta">
+              <span class="pill">soft</span><span class="pill">botanical</span><span class="pill">ambient</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="about">
+      <div class="section-head">
+        <h2>About</h2>
+        <div class="hint">Short + real</div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <p style="margin:0 0 10px 0;">
+            <strong>Gingerbeer</strong> is a generative visual project built from live code systems and evolving signal behaviors.
+          </p>
+          <p style="margin:0 0 10px 0;">
+            Visuals are not “clips” — they’re <strong>behaviors</strong>: audio-driven motion, camera mutation, organic textures, and glitch atmospheres.
+          </p>
+          <p style="margin:0;">
+            Designed for projection, performance, galleries, and immersive spaces.
+          </p>
+        </div>
+
+        <div class="panel">
+          <p style="margin:0 0 10px 0;"><strong>Tools</strong></p>
+          <p style="margin:0;">
+            Hydra · live video · audio reactivity (fft) · modular patches · projection setups
+          </p>
+          <div style="height:12px"></div>
+          <p style="margin:0 0 10px 0;"><strong>Available for</strong></p>
+          <p style="margin:0;">Live sets · installations · collaborations · visuals for music releases</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact">
+      <div class="section-head">
+        <h2>Contact</h2>
+        <div class="hint">Drop a line</div>
+      </div>
+
+      <div class="panel">
+        <p style="margin:0 0 10px 0;">
+          Email: <a href="mailto:youremail@domain.com">youremail@domain.com</a><br/>
+          Instagram: <a href="https://instagram.com/yourhandle" target="_blank" rel="noreferrer">@yourhandle</a>
+        </p>
+        <p style="margin:0;">
+          Press kit / reels available on request.
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      <div>© <span id="year"></span> Gingerbeer</div>
+      <div><a href="#top">Back to top ↑</a></div>
+    </footer>
+  </div>
+
+  <!-- Hydra (background only) -->
+  <script src="https://unpkg.com/hydra-synth"></script>
+  <script>
+    // Year
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    // Autoplay helper for portfolio videos (muted autoplay usually works)
+    const vids = document.querySelectorAll(".card video");
+    vids.forEach(v => {
+      v.muted = true;
+      v.playsInline = true;
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    });
+
+    // Cursor influence (ambient, not "editing")
+    const M = { x: 0.5, y: 0.5 };
+    window.addEventListener("mousemove", (e) => {
+      M.x = e.clientX / window.innerWidth;
+      M.y = e.clientY / window.innerHeight;
+    }, { passive: true });
+
+    // Fit Hydra canvas to screen
+    const canvas = document.getElementById("hydra-bg");
+    function fit() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+    }
+    window.addEventListener("resize", fit, { passive: true });
+    fit();
+
+    // Start Hydra on the background canvas (no editor, no UI)
+    const hydra = new Hydra({
+      canvas,
+      detectAudio: false,
+      enableStreamCapture: false
+    });
+
+    const mx = () => M.x;
+    const my = () => M.y;
+
+    // Gingerbeer-ish background patch:
+    // Organic signal + soft glitch. Cursor subtly changes density + modulation.
+    osc(() => 7 + mx()*16, 0.055, () => 1.05 + my()*0.85)
+      .modulateScale(
+        voronoi(() => 800.5 + my()*7, 4.11, 0.26)
+          .rotate(() => time*0.05)
+          .scrollX(() => (mx()-0.5)*0.06, 0.12)
+          .scrollY(() => (my()-0.5)*0.06, 0.13),
+        () => 0.10 + mx()*0.32
+      )
+      .diff(
+        noise(() => 1.8 + mx()*5.5, 0.20)
+          .contrast(1.35)
+          .brightness(-0.08),
+        () => 0.06 + my()*0.22
+      )
+      .color(9.14, 1.0, 0.34)
+      .brightness(-0.007)
+      .contrast(0.16)
+      .out();
+  </script>
+</body>
+</html>
